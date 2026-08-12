@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZONEGUARD – Sistem Deteksi Intrusi Real-Time</title>
+  <meta name="description" content="Sistem deteksi intrusi area terlarang berbasis web menggunakan YOLOv8 + OpenVINO. Deteksi real-time, gambar zona terlarang, dan alert otomatis." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ════════════════ AUDIO ════════════════ -->
+<audio id="audio-alert" preload="auto">
+  <source src="/static/audio/alert.mp3" type="audio/mpeg" />
+</audio>
+
+<!-- ════════════════ HEADER ════════════════ -->
+<header class="header" id="main-header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 2L3 7V12C3 17.55 6.84 22.74 12 24C17.16 22.74 21 17.55 21 12V7L12 2Z" fill="currentColor" opacity="0.2"/>
+          <path d="M12 2L3 7V12C3 17.55 6.84 22.74 12 24C17.16 22.74 21 17.55 21 12V7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <span class="logo-name">ZONE<span class="logo-accent">GUARD</span></span>
+        <span class="logo-sub">Intrusion Detection System</span>
+      </div>
+    </div>
+
+    <div class="header-status" id="header-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-label">Menginisialisasi…</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" id="btn-audio-toggle" title="Toggle audio alert" aria-label="Toggle audio alert">
+        <svg id="icon-audio-on" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19.07 4.93C20.96 6.82 22 9.35 22 12C22 14.65 20.96 17.18 19.07 19.07" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M15.54 8.46C16.48 9.4 17 10.67 17 12C17 13.33 16.48 14.6 15.54 15.54" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <svg id="icon-audio-off" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
+          <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="model-badge">
+        <span class="badge-dot"></span>
+        YOLOv8 + OpenVINO
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════ ALERT BANNER ════════════════ -->
+<div class="alert-banner" id="alert-banner" aria-live="assertive">
+  <div class="alert-banner-inner">
+    <div class="alert-icon">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M10.29 3.86L1.82 18C1.64 18.3 1.55 18.64 1.55 18.99C1.55 19.99 2.36 20.81 3.37 20.81H20.63C21.64 20.81 22.45 20 22.45 18.99C22.45 18.64 22.36 18.3 22.18 18L13.71 3.86C13.32 3.19 12.62 2.79 11.86 2.79C11.1 2.79 10.4 3.19 10.29 3.86Z" fill="currentColor" opacity="0.15"/>
+        <path d="M10.29 3.86L1.82 18C1.64 18.3 1.55 18.64 1.55 18.99C1.55 19.99 2.36 20.81 3.37 20.81H20.63C21.64 20.81 22.45 20 22.45 18.99C22.45 18.64 22.36 18.3 22.18 18L13.71 3.86C13.32 3.19 12.62 2.79 11.86 2.79C11.1 2.79 10.4 3.19 10.29 3.86Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="currentColor"/>
+      </svg>
+    </div>
+    <span id="alert-text">INTRUSI TERDETEKSI!</span>
+    <span id="alert-count" class="alert-count"></span>
+  </div>
+</div>
+
+<!-- ════════════════ MAIN LAYOUT ════════════════ -->
+<main class="main-layout">
+
+  <!-- ── LEFT PANEL: Controls ── -->
+  <aside class="panel panel-left" id="panel-left">
+    <div class="panel-section">
+      <h2 class="panel-title">Kamera</h2>
+      <div class="cam-controls">
+        <button class="btn btn-primary w-full" id="btn-start-cam">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M16 10L22 7V17L16 14V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Aktifkan Webcam
+        </button>
+        <button class="btn btn-ghost w-full" id="btn-stop-cam" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          Hentikan Webcam
+        </button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel-section">
+      <h2 class="panel-title">Zona Terlarang</h2>
+      <p class="panel-desc">Klik di atas video untuk menandai titik-titik area terlarang, lalu tutup polygon.</p>
+      <div class="zone-controls">
+        <button class="btn btn-warning w-full" id="btn-draw-zone" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 19L19 12L22 9L15 2L12 5L5 12L12 19Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M18 13L22 22L17 20L13 22L18 13Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Gambar Zona
+        </button>
+        <button class="btn btn-ghost w-full" id="btn-close-zone" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="20 6 9 17 4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Tutup Polygon
+        </button>
+        <button class="btn btn-danger-ghost w-full" id="btn-reset-zone" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 6V20C19 20.55 18.55 21 18 21H6C5.45 21 5 20.55 5 20V6M8 6V4C8 3.45 8.45 3 9 3H15C15.55 3 16 3.45 16 4V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reset Zona
+        </button>
+      </div>
+      <div class="zone-info" id="zone-info">
+        <span id="zone-point-count">0 titik</span>
+        <span class="zone-info-sep">·</span>
+        <span id="zone-status-text">Belum ada zona</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel-section">
+      <h2 class="panel-title">Deteksi</h2>
+      <div class="detect-controls">
+        <button class="btn btn-success w-full" id="btn-start-detect" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Mulai Deteksi
+        </button>
+        <button class="btn btn-ghost w-full" id="btn-stop-detect" disabled>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          Hentikan Deteksi
+        </button>
+      </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="conf-slider">
+          Confidence Threshold
+          <span class="slider-value" id="conf-value">0.40</span>
+        </label>
+        <input type="range" id="conf-slider" class="slider" min="0.1" max="0.95" step="0.05" value="0.40" aria-label="Confidence threshold" />
+        <div class="slider-track-labels"><span>0.1</span><span>0.95</span></div>
+      </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="interval-slider">
+          Interval Deteksi
+          <span class="slider-value" id="interval-value">300ms</span>
+        </label>
+        <input type="range" id="interval-slider" class="slider" min="100" max="1000" step="50" value="300" aria-label="Detection interval" />
+        <div class="slider-track-labels"><span>100ms</span><span>1000ms</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel-section">
+      <h2 class="panel-title">Statistik Sesi</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-frames">0</div>
+          <div class="stat-label">Frame Diproses</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-persons">0</div>
+          <div class="stat-label">Orang Terdeteksi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value danger" id="stat-intrusions">0</div>
+          <div class="stat-label">Total Intrusi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-fps">–</div>
+          <div class="stat-label">Latency (ms)</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── CENTER: Video canvas ── -->
+  <section class="video-section" id="video-section">
+    <div class="canvas-wrapper" id="canvas-wrapper">
+      <!-- Webcam video (hidden, used as source) -->
+      <video id="webcam-video" autoplay muted playsinline aria-label="Webcam stream" style="display:none"></video>
+      <!-- Main render canvas -->
+      <canvas id="render-canvas" aria-label="Deteksi video feed"></canvas>
+      <!-- Overlay for drawing zone -->
+      <canvas id="zone-canvas" aria-label="Zone drawing overlay"></canvas>
+
+      <!-- Placeholder when camera is off -->
+      <div class="camera-placeholder" id="camera-placeholder">
+        <div class="placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M16 10L22 7V17L16 14V10Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+            <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="placeholder-text">Webcam belum aktif</p>
+        <p class="placeholder-sub">Klik "Aktifkan Webcam" untuk memulai</p>
+      </div>
+
+      <!-- Scanning animation overlay -->
+      <div class="scan-line" id="scan-line" style="display:none"></div>
+
+      <!-- Corner decorations -->
+      <div class="corner corner-tl" aria-hidden="true"></div>
+      <div class="corner corner-tr" aria-hidden="true"></div>
+      <div class="corner corner-bl" aria-hidden="true"></div>
+      <div class="corner corner-br" aria-hidden="true"></div>
+    </div>
+
+    <!-- Status bar below video -->
+    <div class="video-status-bar">
+      <div class="vsb-item" id="vsb-detect-status">
+        <span class="vsb-dot"></span>
+        <span id="vsb-detect-label">Idle</span>
+      </div>
+      <div class="vsb-item">
+        <span class="vsb-icon">⬡</span>
+        <span id="vsb-zone-label">Zona: 0 titik</span>
+      </div>
+      <div class="vsb-item">
+        <span class="vsb-icon">🎯</span>
+        <span id="vsb-conf-label">Conf: 0.40</span>
+      </div>
+      <div class="vsb-sep"></div>
+      <div class="vsb-item">
+        <span id="vsb-time">--:--:--</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RIGHT PANEL: Event Log ── -->
+  <aside class="panel panel-right" id="panel-right">
+    <div class="panel-section panel-section-fill">
+      <div class="log-header">
+        <h2 class="panel-title">Log Kejadian</h2>
+        <button class="btn btn-ghost btn-xs" id="btn-clear-log">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 6V20C19 20.55 18.55 21 18 21H6C5.45 21 5 20.55 5 20V6M8 6V4C8 3.45 8.45 3 9 3H15C15.55 3 16 3.45 16 4V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Hapus
+        </button>
+      </div>
+
+      <div class="log-list" id="log-list">
+        <div class="log-empty" id="log-empty">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.2"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="currentColor"/></svg>
+          <p>Belum ada kejadian intrusi</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<!-- ════════════════ TOOLTIP ════════════════ -->
+<div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+<!-- ════════════════ SCRIPTS ════════════════ -->
+<script src="/static/js/app.js"></script>
+</body>
+</html>
