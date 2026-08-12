@@ -514,35 +514,79 @@ body {
   margin-top: 4px;
 }
 
-/* Stats */
-.stats-grid {
+/* Top Stats Bar Above Video */
+.top-stats-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
 }
 
-.stat-card {
+.top-stats-bar .stat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px;
-  text-align: center;
-  transition: border-color var(--transition);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  transition: all var(--transition);
 }
 
-.stat-card:hover { border-color: var(--border-bright); }
+.top-stats-bar .stat-card:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-card-hover);
+}
 
-.stat-value {
-  font-size: 1.3rem;
+.top-stats-bar .stat-icon {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.top-stats-bar .stat-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.top-stats-bar .stat-value {
+  font-size: 1.15rem;
   font-weight: 800;
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
   line-height: 1;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
-.stat-value.danger { color: var(--danger); }
-.stat-label { font-size: 0.65rem; color: var(--text-muted); line-height: 1.3; }
+.top-stats-bar .stat-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.top-stats-bar .stat-card-danger {
+  border-color: rgba(255, 64, 96, 0.25);
+}
+
+.top-stats-bar .stat-card-danger:hover {
+  border-color: rgba(255, 64, 96, 0.5);
+  background: rgba(255, 64, 96, 0.08);
+}
 
 /* ════════════════════════════════════
    VIDEO SECTION
@@ -566,22 +610,8 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at center, rgba(59, 158, 255, 0.03) 0%, transparent 70%),
-    var(--bg-base);
-}
-
-/* Grid pattern bg */
-.canvas-wrapper::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(59,158,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59,158,255,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-  z-index: 0;
+  background: #06090e;
+  padding: 8px;
 }
 
 #render-canvas,
@@ -589,13 +619,13 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  /* Always fit within available space — never overflow parent */
+  /* Always fit cleanly within available space */
   max-width:  calc(100% - 16px);
   max-height: calc(100% - 16px);
   width:  auto;
   height: auto;
   border-radius: var(--radius-md);
-  box-shadow: 0 0 0 1px var(--border), 0 20px 60px rgba(0,0,0,0.5);
+  box-shadow: 0 0 0 1px var(--border), 0 12px 40px rgba(0,0,0,0.6);
 }
 
 #render-canvas { z-index: 1; }
@@ -938,6 +968,29 @@ body.intrusion-active .canvas-wrapper::after {
   .vsb-item:nth-child(n+3) { display: none; }
 }
 
+  /* Mobile */
+@media (max-width: 580px) {
+  .top-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px;
+  }
+  .top-stats-bar .stat-card {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .top-stats-bar .stat-icon {
+    width: 26px; height: 26px;
+    font-size: 0.95rem;
+  }
+  .top-stats-bar .stat-value {
+    font-size: 1rem;
+  }
+  .top-stats-bar .stat-label {
+    font-size: 0.6rem;
+  }
+}
+
 /* Mobile */
 @media (max-width: 480px) {
   html { font-size: 13px; }
@@ -949,8 +1002,8 @@ body.intrusion-active .canvas-wrapper::after {
   .header-status { display: none; } /* only status dot + label in header */
 
   .video-section {
-    height: 60vw;
-    min-height: 220px;
+    height: 65vw;
+    min-height: 240px;
   }
 
   .btn { padding: 7px 10px; font-size: 0.75rem; }
@@ -960,9 +1013,6 @@ body.intrusion-active .canvas-wrapper::after {
   .panel-left .panel-section {
     flex: 1 1 120px;
   }
-
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .stat-value { font-size: 1rem; }
 }
 
 /* ════════════════════════════════════

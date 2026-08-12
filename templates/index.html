@@ -154,34 +154,42 @@
         <div class="slider-track-labels"><span>100ms</span><span>1000ms</span></div>
       </div>
     </div>
+  </aside>
 
-    <div class="divider"></div>
-
-    <div class="panel-section">
-      <h2 class="panel-title">Statistik Sesi</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
+  <!-- ── CENTER: Video canvas ── -->
+  <section class="video-section" id="video-section">
+    <!-- Top Stats Bar -->
+    <div class="top-stats-bar">
+      <div class="stat-card">
+        <div class="stat-icon">📹</div>
+        <div class="stat-content">
           <div class="stat-value" id="stat-frames">0</div>
           <div class="stat-label">Frame Diproses</div>
         </div>
-        <div class="stat-card">
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👤</div>
+        <div class="stat-content">
           <div class="stat-value" id="stat-persons">0</div>
           <div class="stat-label">Orang Terdeteksi</div>
         </div>
-        <div class="stat-card">
+      </div>
+      <div class="stat-card stat-card-danger">
+        <div class="stat-icon">🚨</div>
+        <div class="stat-content">
           <div class="stat-value danger" id="stat-intrusions">0</div>
           <div class="stat-label">Total Intrusi</div>
         </div>
-        <div class="stat-card">
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-content">
           <div class="stat-value" id="stat-fps">–</div>
           <div class="stat-label">Latency (ms)</div>
         </div>
       </div>
     </div>
-  </aside>
 
-  <!-- ── CENTER: Video canvas ── -->
-  <section class="video-section" id="video-section">
     <div class="canvas-wrapper" id="canvas-wrapper">
       <!-- Webcam video (hidden, used as source) -->
       <video id="webcam-video" autoplay muted playsinline aria-label="Webcam stream" style="display:none"></video>
@@ -205,12 +213,6 @@
 
       <!-- Scanning animation overlay -->
       <div class="scan-line" id="scan-line" style="display:none"></div>
-
-      <!-- Corner decorations -->
-      <div class="corner corner-tl" aria-hidden="true"></div>
-      <div class="corner corner-tr" aria-hidden="true"></div>
-      <div class="corner corner-bl" aria-hidden="true"></div>
-      <div class="corner corner-br" aria-hidden="true"></div>
     </div>
 
     <!-- Status bar below video -->
