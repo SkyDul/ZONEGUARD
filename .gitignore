@@ -36,3 +36,5 @@ env/
 
 # Project specific
 *.zip
+kernel.errors.txt
+*.log

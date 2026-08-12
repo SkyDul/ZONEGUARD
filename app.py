@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 from tracker import ByteTracker
+from model_loader import load_model, ModelInfo
 
 # ──────────────────────────────────────────────────────────────
 # App setup
@@ -22,7 +23,6 @@ log = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────────
-MODEL_XML      = os.path.join("models", "best_openvino_model", "best.xml")
 CLASSES        = {0: "gun", 1: "intruder"}
 CONF_THRESHOLD = 0.4
 INPUT_SIZE     = (640, 640)
@@ -31,38 +31,22 @@ TRAIL_MAX_LEN  = 30   # max historical positions per track_id
 # ──────────────────────────────────────────────────────────────
 # Global state
 # ──────────────────────────────────────────────────────────────
-compiled_model = None
-input_layer    = None
-output_layer   = None
-model_lock     = threading.Lock()
+model_info: ModelInfo = None   # set at startup
+model_lock  = threading.Lock()
 
 zones: list[list[dict]] = []   # [{x,y} normalized 0-1] per polygon
-event_log: list[dict]  = []
+event_log: list[dict]   = []
 
 # Per-track history: {track_id: [(cx_norm, cy_norm), ...]}
 trail_history: dict[int, list[tuple]] = {}
 
-tracker = ByteTracker(iou_threshold=0.35, max_age=10)
+tracker      = ByteTracker(iou_threshold=0.35, max_age=10)
 tracker_lock = threading.Lock()
 
 # ──────────────────────────────────────────────────────────────
-# Model loading
+# Model loading (startup, once)
 # ──────────────────────────────────────────────────────────────
-def load_model():
-    global compiled_model, input_layer, output_layer
-    try:
-        from openvino.runtime import Core
-        ie = Core()
-        model = ie.read_model(MODEL_XML)
-        compiled_model = ie.compile_model(model, "CPU")
-        input_layer    = compiled_model.input(0)
-        output_layer   = compiled_model.output(0)
-        log.info("✅ OpenVINO model loaded successfully.")
-    except Exception as e:
-        log.error(f"❌ Failed to load model: {e}")
-        compiled_model = None
-
-load_model()
+model_info = load_model()
 
 # ──────────────────────────────────────────────────────────────
 # Preprocessing / Postprocessing
@@ -117,6 +101,30 @@ def postprocess(output, scale, pad_top, pad_left, orig_h, orig_w, conf_thresh):
     return [raw[i] for i in idxs.flatten()]
 
 
+def postprocess_pytorch(results, orig_h, orig_w, conf_thresh):
+    """Parse Ultralytics YOLO result objects → list of detection dicts."""
+    detections = []
+    for r in results:
+        if r.boxes is None:
+            continue
+        for box in r.boxes:
+            conf = float(box.conf[0])
+            if conf < conf_thresh:
+                continue
+            cls_id = int(box.cls[0])
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            detections.append({
+                "x1": float(np.clip(x1, 0, orig_w)),
+                "y1": float(np.clip(y1, 0, orig_h)),
+                "x2": float(np.clip(x2, 0, orig_w)),
+                "y2": float(np.clip(y2, 0, orig_h)),
+                "confidence": conf,
+                "class_id":   cls_id,
+                "class_name": CLASSES.get(cls_id, "unknown"),
+            })
+    return detections
+
+
 def point_in_polygon(px, py, polygon_norm, img_w, img_h):
     if len(polygon_norm) < 3:
         return False
@@ -145,6 +153,43 @@ def prune_trails(active_ids: set):
 
 
 # ──────────────────────────────────────────────────────────────
+# Inference dispatcher (works for both backends)
+# ──────────────────────────────────────────────────────────────
+def run_inference_on_frame(img_bgr, conf_thresh):
+    """
+    Dispatch inference to the correct backend.
+    Returns list of detection dicts (same format for both backends).
+    Raises RuntimeError if model is not loaded.
+    """
+    if not model_info.is_loaded:
+        raise RuntimeError(
+            "Model tidak dapat dimuat. "
+            "Pastikan file best.pt atau best_openvino_model tersedia di folder project."
+        )
+
+    orig_h, orig_w = img_bgr.shape[:2]
+
+    if model_info.backend == "openvino":
+        blob, scale, pad_top, pad_left = preprocess(img_bgr)
+        raw_output = model_info.compiled_model(
+            {model_info.input_layer: blob}
+        )[model_info.output_layer]
+        return postprocess(raw_output, scale, pad_top, pad_left, orig_h, orig_w, conf_thresh)
+
+    elif model_info.backend == "pytorch":
+        results = model_info.pt_model.predict(
+            source=img_bgr,
+            conf=conf_thresh,
+            verbose=False,
+            device=model_info.device,
+        )
+        return postprocess_pytorch(results, orig_h, orig_w, conf_thresh)
+
+    else:
+        raise RuntimeError("Backend tidak dikenal: " + model_info.backend)
+
+
+# ──────────────────────────────────────────────────────────────
 # API Routes
 # ──────────────────────────────────────────────────────────────
 @app.route("/")
@@ -160,8 +205,13 @@ def static_files(path):
 # ── POST /detect ─────────────────────────────────────────────
 @app.route("/detect", methods=["POST"])
 def detect():
-    if compiled_model is None:
-        return jsonify({"error": "Model not loaded"}), 503
+    if not model_info.is_loaded:
+        return jsonify({
+            "error": (
+                "Model tidak dapat dimuat. "
+                "Pastikan file best.pt atau best_openvino_model tersedia di folder project."
+            )
+        }), 503
 
     data = request.get_json(force=True)
     if not data or "frame" not in data:
@@ -183,15 +233,12 @@ def detect():
 
     # ── Inference ────────────────────────────────────────────
     with model_lock:
-        blob, scale, pad_top, pad_left = preprocess(img_bgr)
         try:
-            raw_output = compiled_model({input_layer: blob})[output_layer]
+            detections = run_inference_on_frame(img_bgr, conf_thresh)
         except Exception as e:
             return jsonify({"error": f"Inference error: {e}"}), 500
 
-    detections = postprocess(raw_output, scale, pad_top, pad_left, orig_h, orig_w, conf_thresh)
-
-    # ── Tracking ─────────────────────────────────────────────
+    # ── Tracking (ByteTracker — same for both backends) ──────
     with tracker_lock:
         detections = tracker.update(detections)
 
@@ -298,10 +345,16 @@ def clear_events():
 @app.route("/status", methods=["GET"])
 def status():
     return jsonify({
-        "model_loaded":  compiled_model is not None,
-        "zones_count":   len(zones),
-        "events_count":  len(event_log),
-        "tracks_active": len(tracker.tracks),
+        "model_loaded":        model_info.is_loaded,
+        "backend":             model_info.backend,
+        "device":              model_info.device,
+        "cpu_name":            model_info.cpu_name,
+        "cpu_brand":           model_info.cpu_brand,
+        "ov_devices":          model_info.available_ov_devices,
+        "hardware_label":      model_info.display_label,
+        "zones_count":         len(zones),
+        "events_count":        len(event_log),
+        "tracks_active":       len(tracker.tracks),
     })
 
 

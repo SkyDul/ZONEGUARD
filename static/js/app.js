@@ -95,6 +95,10 @@ const vsbZoneLabel   = q('vsb-zone-label');
 const vsbConfLabel   = q('vsb-conf-label');
 const vsbTime        = q('vsb-time');
 
+// Hardware badge
+const hwBadgeLabel = q('hw-badge-label');
+const hwBadgeDot   = q('hw-badge-dot');
+
 // Log
 const logList   = q('log-list');
 const logEmpty  = q('log-empty');
@@ -747,6 +751,26 @@ btnClearLog.addEventListener('click', () => {
   fetch(API_BASE + '/events/clear', { method: 'POST' }).catch(() => {});
 });
 
+// ─── Hardware badge update ────────────────────────────────────
+function updateHardwareBadge(data) {
+  if (!hwBadgeLabel) return;
+
+  if (!data.model_loaded) {
+    hwBadgeLabel.textContent = 'Model tidak termuat';
+    hwBadgeDot.style.background = '#ef4444';
+    hwBadgeDot.style.boxShadow  = '0 0 6px #ef4444';
+    return;
+  }
+
+  const label = data.hardware_label || `${data.backend} [${data.device}]`;
+  hwBadgeLabel.textContent = label;
+
+  // Color: blue for OpenVINO, purple for PyTorch
+  const color = data.backend === 'openvino' ? '#3B9EFF' : '#C084FC';
+  hwBadgeDot.style.background = color;
+  hwBadgeDot.style.boxShadow  = `0 0 8px ${color}`;
+}
+
 // ─── Initial server status check ─────────────────────────────
 async function checkServerStatus() {
   try {
@@ -757,8 +781,10 @@ async function checkServerStatus() {
     } else {
       setStatus('Server aktif · Model gagal dimuat', 'warning');
     }
+    updateHardwareBadge(data);
   } catch (e) {
     setStatus('Server tidak terhubung – jalankan app.py', '');
+    if (hwBadgeLabel) hwBadgeLabel.textContent = 'Server offline';
     console.warn('Server not reachable:', e);
   }
 }

@@ -49,6 +49,10 @@
   --radius-lg:      16px;
   --radius-xl:      24px;
 
+  /* Canvas */
+  --canvas-max-w:   100%;
+  --canvas-max-h:   100%;
+
   /* Transitions */
   --transition:     0.2s ease;
   --transition-slow: 0.4s ease;
@@ -271,16 +275,20 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  /* subtract header + any alert banner height; min prevents collapse */
   height: calc(100vh - var(--header-h));
+  min-height: 0;   /* critical: allow flex children to shrink */
 }
 
 /* ── PANELS ── */
 .panel {
   width: var(--panel-w);
+  min-width: 0;          /* allow shrinking below content width */
   flex-shrink: 0;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -541,6 +549,8 @@ body {
 ════════════════════════════════════ */
 .video-section {
   flex: 1;
+  min-width: 0;        /* CRITICAL: allow shrinking in flex row */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-base);
@@ -550,6 +560,7 @@ body {
 
 .canvas-wrapper {
   flex: 1;
+  min-height: 0;       /* allow shrinking vertically */
   position: relative;
   display: flex;
   align-items: center;
@@ -578,8 +589,11 @@ body {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  max-width: 100%;
-  max-height: 100%;
+  /* Always fit within available space — never overflow parent */
+  max-width:  calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  width:  auto;
+  height: auto;
   border-radius: var(--radius-md);
   box-shadow: 0 0 0 1px var(--border), 0 20px 60px rgba(0,0,0,0.5);
 }
@@ -660,20 +674,23 @@ body {
   gap: 0;
   background: rgba(10, 17, 32, 0.9);
   border-top: 1px solid var(--border);
-  padding: 0 16px;
+  padding: 0 8px;
   flex-shrink: 0;
   font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;   /* prevent overflow on narrow screens */
 }
 
 .vsb-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-right: 1px solid var(--border);
   height: 100%;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .vsb-item:last-child { border-right: none; }
@@ -690,7 +707,7 @@ body {
 .vsb-dot.success { background: var(--success); box-shadow: 0 0 6px var(--success); }
 
 .vsb-icon { font-size: 0.7rem; }
-.vsb-sep  { flex: 1; }
+.vsb-sep  { flex: 1; min-width: 8px; }
 
 /* ════════════════════════════════════
    EVENT LOG
@@ -821,16 +838,131 @@ body.intrusion-active .canvas-wrapper::after {
 /* ════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════ */
-@media (max-width: 1100px) {
-  .panel { width: 220px; }
-  :root { --panel-w: 220px; }
+
+/* Large desktop: give panels a little more room */
+@media (min-width: 1400px) {
+  :root { --panel-w: 280px; }
 }
 
-@media (max-width: 800px) {
-  .main-layout { flex-direction: column; }
-  .panel { width: 100%; max-height: 280px; overflow-y: auto; }
-  .panel-right { border-left: none; border-top: 1px solid var(--border); max-height: 220px; }
-  .video-section { flex: 1; min-height: 300px; }
+/* Medium desktop: tighter panels */
+@media (max-width: 1200px) {
+  :root { --panel-w: 230px; }
+}
+
+/* Small desktop / large tablet */
+@media (max-width: 1024px) {
+  :root { --panel-w: 200px; }
+
+  .panel-desc { display: none; } /* hide verbose descriptions */
+
+  .header-status { max-width: 220px; overflow: hidden; }
+  #status-label  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Tighten status bar items */
+  .vsb-item { padding: 0 8px; }
+  .vsb-item:nth-child(3) { display: none; } /* hide conf on smaller screens */
+}
+
+/* Tablet landscape / narrow desktop */
+@media (max-width: 900px) {
+  :root { --panel-w: 180px; }
+
+  .logo-sub { display: none; }
+  .model-badge { display: none; } /* too crowded in header */
+
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-value { font-size: 1.1rem; }
+
+  /* Tighter panel padding */
+  .panel-section { padding: 12px; }
+  .divider       { margin: 0 12px; }
+}
+
+/* Tablet portrait */
+@media (max-width: 768px) {
+  .main-layout {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    overflow-y: auto;
+  }
+
+  /* Left panel becomes a horizontal scrollable toolbar */
+  .panel-left {
+    width: 100%;
+    max-height: none;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow-y: visible;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 8px;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .panel-left .panel-section {
+    padding: 0;
+    flex: 1 1 140px;       /* sections flow side by side */
+    min-width: 130px;
+  }
+
+  .panel-left .divider { display: none; }
+  .panel-left .panel-title { margin-bottom: 8px; }
+
+  /* Video section gets a fixed height */
+  .video-section {
+    width: 100%;
+    height: 55vw;           /* ~16:9 feel */
+    min-height: 260px;
+    max-height: 480px;
+    flex-shrink: 0;
+  }
+
+  .canvas-wrapper {
+    height: 100%;
+  }
+
+  /* Right panel (log) below video */
+  .panel-right {
+    width: 100%;
+    max-height: 220px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Status bar: only show first two items */
+  .video-status-bar { font-size: 0.7rem; }
+  .vsb-item:nth-child(n+3) { display: none; }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  html { font-size: 13px; }
+
+  .header-inner { padding: 0 12px; gap: 10px; }
+  .logo-icon    { width: 28px; height: 28px; }
+  .logo-name    { font-size: 1rem; }
+
+  .header-status { display: none; } /* only status dot + label in header */
+
+  .video-section {
+    height: 60vw;
+    min-height: 220px;
+  }
+
+  .btn { padding: 7px 10px; font-size: 0.75rem; }
+  .btn svg { width: 13px; height: 13px; }
+
+  /* Panel sections stack compactly */
+  .panel-left .panel-section {
+    flex: 1 1 120px;
+  }
+
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-value { font-size: 1rem; }
 }
 
 /* ════════════════════════════════════
