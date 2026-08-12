@@ -81,33 +81,42 @@ def _load_openvino(info: ModelInfo) -> bool:
         info.available_ov_devices = available
         log.info(f"OpenVINO device tersedia: {available}")
 
-        # Device priority: NPU > CPU > GPU
-        # NOTE: GPU is placed LAST because OpenVINO GPU defaults to FP16 precision
-        # which causes the YOLOv8 model output to be numerically corrupt
-        # (all confidences become 100%, bounding boxes are invalid).
-        # CPU uses FP32 by default and gives correct results.
-        chosen = "CPU"
-        for pref in ["NPU", "CPU", "GPU"]:
-            if pref in available:
-                chosen = pref
-                break
-
-        # Build compile config — always enforce FP32 to avoid precision issues
-        config = {"INFERENCE_PRECISION_HINT": "f32"}
-
         model = core.read_model(OPENVINO_XML)
-        try:
-            info.compiled_model = core.compile_model(model, chosen, config)
-            log.info(f"Compiled dengan precision: FP32 pada device: {chosen}")
-        except Exception:
-            # Fallback: compile tanpa config (beberapa device tidak support hint ini)
-            info.compiled_model = core.compile_model(model, chosen)
-            log.info(f"Compiled tanpa precision hint pada device: {chosen}")
 
-        info.input_layer  = info.compiled_model.input(0)
-        info.output_layer = info.compiled_model.output(0)
-        info.device       = chosen
-        info.backend      = "openvino"
+        # Device priority: CPU > GPU > NPU
+        # NOTE: NPU requires INT8/FP16 quantization & specific drivers, which can fail at runtime
+        # for FP32 YOLOv8 models. CPU & GPU are standard and fully compatible.
+        devices_to_try = [dev for dev in ["CPU", "GPU", "NPU"] if dev in available]
+
+        compiled = None
+        chosen_device = None
+
+        for dev in devices_to_try:
+            try:
+                config = {"INFERENCE_PRECISION_HINT": "f32"} if dev == "GPU" else {}
+                compiled = core.compile_model(model, dev, config)
+                chosen_device = dev
+                log.info(f"Compiled OpenVINO model pada device: {dev}")
+                break
+            except Exception as e:
+                log.warning(f"Gagal compile OpenVINO pada device {dev}: {e}")
+                try:
+                    compiled = core.compile_model(model, dev)
+                    chosen_device = dev
+                    log.info(f"Compiled OpenVINO model (tanpa config) pada device: {dev}")
+                    break
+                except Exception as e2:
+                    log.warning(f"Gagal compile fallback OpenVINO pada device {dev}: {e2}")
+
+        if compiled is None:
+            log.warning("Semua device OpenVINO gagal dicompile.")
+            return False
+
+        info.compiled_model = compiled
+        info.input_layer    = compiled.input(0)
+        info.output_layer   = compiled.output(0)
+        info.device         = chosen_device
+        info.backend        = "openvino"
         return True
 
     except Exception as e:
