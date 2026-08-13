@@ -39,9 +39,9 @@ env/
 kernel.errors.txt
 *.log
 
-# Model binary weights (terlalu besar untuk GitHub tanpa LFS)
-# Hanya .xml dan metadata.yaml yang di-track
-models/**/*.bin
+# Model binary weights
+# .bin di-track (< 100MB, aman untuk GitHub)
+# .pt dan .onnx dikecualikan karena biasanya lebih besar
 models/**/*.pt
 models/**/*.onnx
 
