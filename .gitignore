@@ -38,3 +38,12 @@ env/
 *.zip
 kernel.errors.txt
 *.log
+
+# Model binary weights (terlalu besar untuk GitHub tanpa LFS)
+# Hanya .xml dan metadata.yaml yang di-track
+models/**/*.bin
+models/**/*.pt
+models/**/*.onnx
+
+# OpenVINO compile cache
+models/.ov_cache/

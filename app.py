@@ -348,6 +348,7 @@ def status():
         "model_loaded":        model_info.is_loaded,
         "backend":             model_info.backend,
         "device":              model_info.device,
+        "quantization":        model_info.quantization,   # "int8" | "fp32" | "none"
         "cpu_name":            model_info.cpu_name,
         "cpu_brand":           model_info.cpu_brand,
         "ov_devices":          model_info.available_ov_devices,

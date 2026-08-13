@@ -2,8 +2,13 @@
 model_loader.py — Auto-detect hardware & load YOLOv8 model
 ============================================================
 Priority logic:
-  - Intel CPU  → OpenVINO (NPU > GPU > CPU) → fallback .pt
+  - Intel CPU  → OpenVINO INT8 (NPU > GPU > CPU) → fallback .pt
   - Non-Intel  → PyTorch .pt (CUDA if available, else CPU)
+
+Model INT8 (quantized) is used for Intel hardware:
+  - NPU  : Optimal — INT8 native, low power, highest efficiency
+  - GPU  : Good    — INT8 accelerated via OpenVINO
+  - CPU  : Fallback — INT8 gives ~2x speedup vs FP32
 
 Model is loaded ONCE at server startup, not per-request.
 """
@@ -14,7 +19,12 @@ import logging
 log = logging.getLogger(__name__)
 
 # ── File paths ─────────────────────────────────────────────────
-OPENVINO_XML  = os.path.join("models", "best_openvino_model", "best.xml")
+# INT8 model — optimized for Intel NPU/GPU/CPU via OpenVINO quantization
+OPENVINO_INT8_XML = os.path.join("models", "openvino_int8", "best.xml")
+# Fallback FP32 model (legacy path, kept for backward compatibility)
+OPENVINO_FP32_XML = os.path.join("models", "best_openvino_model", "best.xml")
+# Active model path: prefer INT8, fall back to FP32 if not found
+OPENVINO_XML  = OPENVINO_INT8_XML if os.path.exists(OPENVINO_INT8_XML) else OPENVINO_FP32_XML
 PT_MODEL_PATH = os.path.join("models", "yolo", "best.pt")
 
 # ── Result container ───────────────────────────────────────────
@@ -27,6 +37,7 @@ class ModelInfo:
         self.cpu_brand: str = "unknown"
         self.cpu_name: str  = "unknown"
         self.available_ov_devices: list = []
+        self.quantization: str = "none"     # "int8" | "fp32" | "none"
 
         # OpenVINO handles
         self.compiled_model = None
@@ -44,7 +55,9 @@ class ModelInfo:
     def display_label(self) -> str:
         """Human-readable badge for the frontend."""
         if self.backend == "openvino":
-            return f"Intel {self.cpu_name.split('(R)')[-1].strip()} · OpenVINO [{self.device}]"
+            quant_tag = f" INT8" if self.quantization == "int8" else ""
+            cpu_short = self.cpu_name.split('(R)')[-1].strip()
+            return f"Intel {cpu_short} · OpenVINO{quant_tag} [{self.device}]"
         elif self.backend == "pytorch":
             dev = self.device.upper()
             brand = "AMD" if "amd" in self.cpu_brand.lower() else self.cpu_brand.title()
@@ -73,7 +86,14 @@ def _detect_cpu() -> tuple[str, str]:
 
 
 def _load_openvino(info: ModelInfo) -> bool:
-    """Try loading OpenVINO model with best available device. Returns True on success."""
+    """
+    Try loading OpenVINO model with best available device.
+    INT8 model → Device priority: NPU > GPU > CPU
+    - NPU: native INT8 acceleration, lowest power, best for always-on monitoring
+    - GPU: hardware INT8 via Intel iGPU
+    - CPU: software INT8, ~2x faster than FP32
+    Returns True on success.
+    """
     try:
         from openvino import Core
         core = Core()
@@ -81,29 +101,57 @@ def _load_openvino(info: ModelInfo) -> bool:
         info.available_ov_devices = available
         log.info(f"OpenVINO device tersedia: {available}")
 
+        # Determine if we're using INT8 model
+        is_int8 = (OPENVINO_XML == OPENVINO_INT8_XML)
+        quant_label = "INT8" if is_int8 else "FP32"
+        log.info(f"Model path    : {OPENVINO_XML} ({quant_label})")
+
         model = core.read_model(OPENVINO_XML)
 
-        # Device priority: CPU > GPU > NPU
-        # NOTE: NPU requires INT8/FP16 quantization & specific drivers, which can fail at runtime
-        # for FP32 YOLOv8 models. CPU & GPU are standard and fully compatible.
-        devices_to_try = [dev for dev in ["CPU", "GPU", "NPU"] if dev in available]
+        # Device priority: NPU > GPU > CPU
+        # INT8 model is fully compatible with all three devices.
+        # NPU is prioritized because INT8 is its native precision → best perf/watt.
+        devices_to_try = [dev for dev in ["NPU", "GPU", "CPU"] if dev in available]
+        if not devices_to_try:
+            devices_to_try = ["CPU"]  # absolute fallback
 
         compiled = None
         chosen_device = None
 
         for dev in devices_to_try:
             try:
-                config = {"INFERENCE_PRECISION_HINT": "f32"} if dev == "GPU" else {}
+                # Build device-specific performance config
+                config = {}
+                if dev == "NPU":
+                    # NPU: INT8 native, enable throughput mode for continuous stream
+                    config = {
+                        "PERFORMANCE_HINT": "THROUGHPUT",
+                        "CACHE_DIR":        "./models/.ov_cache",
+                    }
+                elif dev == "GPU":
+                    # GPU: INT8 acceleration, enable caching
+                    config = {
+                        "PERFORMANCE_HINT": "LATENCY",
+                        "CACHE_DIR":        "./models/.ov_cache",
+                    }
+                elif dev == "CPU":
+                    # CPU: INT8 runtime, latency-optimized for single-stream
+                    config = {
+                        "PERFORMANCE_HINT":       "LATENCY",
+                        "INFERENCE_NUM_THREADS":  "0",  # auto-detect optimal threads
+                    }
+
                 compiled = core.compile_model(model, dev, config)
                 chosen_device = dev
-                log.info(f"Compiled OpenVINO model pada device: {dev}")
+                log.info(f"✓ Compiled OpenVINO {quant_label} model pada device: {dev}")
                 break
             except Exception as e:
-                log.warning(f"Gagal compile OpenVINO pada device {dev}: {e}")
+                log.warning(f"Gagal compile OpenVINO pada device {dev} (with config): {e}")
+                # Retry without config
                 try:
                     compiled = core.compile_model(model, dev)
                     chosen_device = dev
-                    log.info(f"Compiled OpenVINO model (tanpa config) pada device: {dev}")
+                    log.info(f"✓ Compiled OpenVINO {quant_label} (tanpa config) pada device: {dev}")
                     break
                 except Exception as e2:
                     log.warning(f"Gagal compile fallback OpenVINO pada device {dev}: {e2}")
@@ -117,6 +165,7 @@ def _load_openvino(info: ModelInfo) -> bool:
         info.output_layer   = compiled.output(0)
         info.device         = chosen_device
         info.backend        = "openvino"
+        info.quantization   = "int8" if is_int8 else "fp32"
         return True
 
     except Exception as e:
@@ -166,13 +215,15 @@ def load_model() -> ModelInfo:
 
     # ── 2. Choose strategy ────────────────────────────────────
     if brand == "intel":
-        log.info("Strategi      : Intel -> OpenVINO (dengan fallback ke .pt)")
+        int8_available = os.path.exists(OPENVINO_INT8_XML)
+        log.info(f"Strategi      : Intel -> OpenVINO {'INT8' if int8_available else 'FP32'} (NPU>GPU>CPU, fallback ke .pt)")
+        log.info(f"INT8 model    : {'TERSEDIA ✓' if int8_available else 'TIDAK ADA — pakai FP32'}")
 
         ov_ok = _load_openvino(info)
 
         if ov_ok:
             log.info(
-                f"Model digunakan: OpenVINO ({OPENVINO_XML}), device: {info.device}"
+                f"Model digunakan: OpenVINO {info.quantization.upper()} ({OPENVINO_XML}), device: {info.device}"
             )
         else:
             log.warning("OpenVINO gagal - beralih ke fallback PyTorch (.pt)")
