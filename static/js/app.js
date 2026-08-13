@@ -407,6 +407,121 @@ btnDrawZone.addEventListener('click',  startDrawingZone);
 btnCloseZone.addEventListener('click', closeZonePolygon);
 btnResetZone.addEventListener('click', resetZone);
 
+// ─── Automatic CCTV Recording ─────────────────────────────
+
+let cctvRecorder = null;
+let cctvChunks = [];
+let cctvStopTimer = null;
+let cctvRecording = false;
+
+const CCTV_POST_INTRUSION_DELAY = 5000;
+
+function startCCTVRecording() {
+    if (cctvRecording) {
+        clearTimeout(cctvStopTimer);
+        return;
+    }
+
+    if (!renderCanvas.captureStream) {
+        console.warn("Browser tidak mendukung canvas recording.");
+        return;
+    }
+
+    const stream = renderCanvas.captureStream(20);
+
+    let mimeType = 'video/webm;codecs=vp9';
+
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8';
+    }
+
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+    }
+
+    cctvChunks = [];
+
+    cctvRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType
+    });
+
+    cctvRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+            cctvChunks.push(event.data);
+        }
+    };
+
+    cctvRecorder.onstop = () => {
+        const blob = new Blob(cctvChunks, {
+            type: mimeType
+        });
+
+        const url = URL.createObjectURL(blob);
+
+        const now = new Date();
+
+        const timestamp =
+            now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') + '_' +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0') +
+            String(now.getSeconds()).padStart(2, '0');
+
+        const a = document.createElement('a');
+
+        a.href = url;
+        a.download = `ZONEGUARD_INTRUSION_${timestamp}.webm`;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+        console.log("CCTV recording tersimpan:", a.download);
+
+        cctvChunks = [];
+        cctvRecorder = null;
+        cctvRecording = false;
+    };
+
+    cctvRecorder.start();
+    cctvRecording = true;
+
+    console.log("🚨 CCTV recording dimulai");
+}
+
+function stopCCTVRecording() {
+    if (!cctvRecorder || cctvRecorder.state === 'inactive') {
+        return;
+    }
+
+    cctvRecorder.stop();
+
+    console.log("CCTV recording dihentikan");
+}
+
+function handleCCTVIntrusion(isIntrusion) {
+    if (isIntrusion) {
+        clearTimeout(cctvStopTimer);
+
+        if (!cctvRecording) {
+            startCCTVRecording();
+        }
+
+    } else if (cctvRecording) {
+
+        clearTimeout(cctvStopTimer);
+
+        cctvStopTimer = setTimeout(() => {
+            stopCCTVRecording();
+        }, CCTV_POST_INTRUSION_DELAY);
+    }
+}
+
 // ─── Detection loop ───────────────────────────────────────────
 function startDetection() {
   if (!state.camActive || state.detecting) return;
@@ -494,15 +609,27 @@ async function runDetectLoop() {
     statPersons.textContent = state.personsDetected;
 
     if (data.intrusion_detected) {
+
       if (!state.intrusion) {
         state.intrCount++;
         statIntrusion.textContent = state.intrCount;
       }
+
       triggerIntrusion(data.detections);
+
+      handleCCTVIntrusion(true);
+
       if (saveEvent) addLogItem(frameData, data.detections);
+
     } else {
+
+      handleCCTVIntrusion(false);
+
       state.intrFreezeFrames = Math.max(0, state.intrFreezeFrames - 1);
-      if (state.intrFreezeFrames === 0) clearIntrusion();
+
+      if (state.intrFreezeFrames === 0) {
+        clearIntrusion();
+      }
     }
 
   } catch (err) {
