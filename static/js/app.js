@@ -534,35 +534,77 @@ function renderDetections(data, _frameData) {
     const tcolor  = isAlert ? '#FF4060' : getTrackColor(tid);
 
     rCtx.save();
-    rCtx.lineJoin  = 'round';
-    rCtx.lineCap   = 'round';
+    rCtx.lineJoin = 'round';
+    rCtx.lineCap  = 'round';
 
+    // ── 1a: Draw gradient trail line ─────────────────────────
     for (let i = 1; i < trail.length; i++) {
-      const alpha   = (i / trail.length) * 0.85;
-      const thick   = (i / trail.length) * 2.5;
+      const progress = i / trail.length;
+      const alpha    = progress * 0.9;
+      const thick    = progress * 3.5 + 0.5;
+
       const [px, py] = [trail[i-1][0] * W, trail[i-1][1] * H];
       const [nx, ny] = [trail[i][0]   * W, trail[i][1]   * H];
 
       rCtx.beginPath();
       rCtx.moveTo(px, py);
       rCtx.lineTo(nx, ny);
-      rCtx.strokeStyle = tcolor;
-      rCtx.globalAlpha = alpha;
-      rCtx.lineWidth   = thick;
+      rCtx.strokeStyle    = tcolor;
+      rCtx.globalAlpha    = alpha;
+      rCtx.lineWidth      = thick;
+      rCtx.shadowBlur     = progress * 8;
+      rCtx.shadowColor    = tcolor;
       rCtx.stroke();
     }
 
-    // Trail head dot
-    const last = trail[trail.length - 1];
+    // ── 1b: Draw small dot at each trail point ────────────────
+    rCtx.shadowBlur = 0;
+    trail.forEach((pt, i) => {
+      if (i === trail.length - 1) return;  // skip head, drawn separately
+      const progress  = (i + 1) / trail.length;
+      const dotRadius = progress * 4 + 1;
+      const alpha     = progress * 0.75;
+
+      rCtx.globalAlpha = alpha;
+      rCtx.beginPath();
+      rCtx.arc(pt[0] * W, pt[1] * H, dotRadius, 0, Math.PI * 2);
+      rCtx.fillStyle = tcolor;
+      rCtx.fill();
+    });
+
+    // ── 1c: Large glowing HEAD dot (current position) ─────────
+    const head = trail[trail.length - 1];
+    const hx   = head[0] * W;
+    const hy   = head[1] * H;
+
     rCtx.globalAlpha = 1;
+
+    // Outer glow ring
     rCtx.beginPath();
-    rCtx.arc(last[0] * W, last[1] * H, 4, 0, Math.PI * 2);
-    rCtx.fillStyle = tcolor;
-    rCtx.shadowBlur  = 8;
+    rCtx.arc(hx, hy, 10, 0, Math.PI * 2);
+    rCtx.fillStyle   = tcolor + '40';  // 25% opacity
+    rCtx.shadowBlur  = 16;
     rCtx.shadowColor = tcolor;
     rCtx.fill();
+
+    // Inner solid dot
+    rCtx.beginPath();
+    rCtx.arc(hx, hy, 6, 0, Math.PI * 2);
+    rCtx.fillStyle   = tcolor;
+    rCtx.shadowBlur  = 12;
+    rCtx.shadowColor = tcolor;
+    rCtx.fill();
+
+    // White center pinpoint
+    rCtx.beginPath();
+    rCtx.arc(hx, hy, 2, 0, Math.PI * 2);
+    rCtx.fillStyle = '#ffffff';
+    rCtx.shadowBlur = 0;
+    rCtx.fill();
+
     rCtx.restore();
   });
+
 
   // ── Pass 2: Draw bounding boxes + labels ────────────────────
   data.detections.forEach(det => {
