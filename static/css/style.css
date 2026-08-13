@@ -62,14 +62,19 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; scroll-behavior: smooth; }
 
+html, body {
+  height: 100%;
+  overflow: hidden;   /* prevent page-level scroll on desktop */
+}
+
 body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -275,9 +280,8 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
-  /* subtract header + any alert banner height; min prevents collapse */
-  height: calc(100vh - var(--header-h));
-  min-height: 0;   /* critical: allow flex children to shrink */
+  min-height: 0;   /* CRITICAL: allow flex children to shrink below content size */
+  /* Use flex:1 so it shrinks naturally when alert banner appears */
 }
 
 /* ── PANELS ── */
@@ -297,6 +301,10 @@ body {
 .panel-right {
   border-right: none;
   border-left: 1px solid var(--border);
+  /* Ensure log panel never pushes layout down */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-section {
@@ -307,7 +315,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden;  /* clip children — log-list scrolls internally */
+  min-height: 0;     /* allow shrinking */
 }
 
 .panel-title {
@@ -751,7 +760,9 @@ body {
 
 .log-list {
   flex: 1;
+  min-height: 0;       /* CRITICAL: allow scroll without expanding parent */
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -910,22 +921,27 @@ body.intrusion-active .canvas-wrapper::after {
 
 /* Tablet portrait */
 @media (max-width: 768px) {
-  .main-layout {
-    flex-direction: column;
-    height: auto;
-    overflow: visible;
-    overflow-y: auto;
+  html, body {
+    height: 100%;
+    overflow: hidden;
   }
 
-  /* Left panel becomes a horizontal scrollable toolbar */
+  .main-layout {
+    flex-direction: column;
+    height: calc(100vh - var(--header-h));
+    overflow: hidden;  /* NO overflow:visible — this was the bug */
+  }
+
+  /* Left panel: compact horizontal toolbar, fixed height */
   .panel-left {
     width: 100%;
-    max-height: none;
     height: auto;
+    max-height: 160px;
+    flex-shrink: 0;
     flex-direction: row;
     flex-wrap: wrap;
-    overflow-y: visible;
-    overflow-x: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 8px;
@@ -935,32 +951,33 @@ body.intrusion-active .canvas-wrapper::after {
 
   .panel-left .panel-section {
     padding: 0;
-    flex: 1 1 140px;       /* sections flow side by side */
+    flex: 1 1 140px;
     min-width: 130px;
   }
 
   .panel-left .divider { display: none; }
   .panel-left .panel-title { margin-bottom: 8px; }
 
-  /* Video section gets a fixed height */
+  /* Video section: flex:1 so it fills remaining space */
   .video-section {
     width: 100%;
-    height: 55vw;           /* ~16:9 feel */
-    min-height: 260px;
-    max-height: 480px;
-    flex-shrink: 0;
+    flex: 1;
+    min-height: 0;
+    flex-shrink: 1;
   }
 
   .canvas-wrapper {
     height: 100%;
   }
 
-  /* Right panel (log) below video */
+  /* Right panel (log): fixed scrollable area below video */
   .panel-right {
     width: 100%;
-    max-height: 220px;
+    flex-shrink: 0;
+    height: 200px;          /* fixed height — log scrolls internally */
     border-left: none;
     border-top: 1px solid var(--border);
+    overflow: hidden;
   }
 
   /* Status bar: only show first two items */
