@@ -2,6 +2,7 @@ import os
 import base64
 import logging
 import threading
+import time
 from datetime import datetime
 
 import numpy as np
@@ -29,6 +30,21 @@ INPUT_SIZE     = (640, 640)
 TRAIL_MAX_LEN  = 30   # max historical positions per track_id
 
 # ──────────────────────────────────────────────────────────────
+# CCTV Recording
+# ──────────────────────────────────────────────────────────────
+
+RECORDINGS_DIR = os.path.join(app.root_path, "recordings")
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+
+recording_writer = None
+recording_filename = None
+recording_last_intrusion = 0
+recording_lock = threading.Lock()
+
+RECORDING_POST_DELAY = 5
+RECORDING_FPS = 5
+
+# ──────────────────────────────────────────────────────────────
 # Global state
 # ──────────────────────────────────────────────────────────────
 model_info: ModelInfo = None   # set at startup
@@ -47,6 +63,133 @@ tracker_lock = threading.Lock()
 # Model loading (startup, once)
 # ──────────────────────────────────────────────────────────────
 model_info = load_model()
+
+def draw_recording_overlay(frame, detections, current_zones):
+    """Draw detection boxes, labels, and zones onto the recorded CCTV frame."""
+    output = frame.copy()
+    h, w = output.shape[:2]
+
+    # Draw zones
+    for zone in current_zones:
+        if len(zone) >= 3:
+            pts = np.array(
+                [[int(p["x"] * w), int(p["y"] * h)] for p in zone],
+                dtype=np.int32
+            )
+            cv2.polylines(
+                output,
+                [pts],
+                isClosed=True,
+                color=(0, 255, 255),
+                thickness=2
+            )
+
+    # Draw detections
+    for det in detections:
+        x1 = int(det["x1"])
+        y1 = int(det["y1"])
+        x2 = int(det["x2"])
+        y2 = int(det["y2"])
+
+        in_zone = det.get("in_zone", False)
+        class_name = det.get("class_name", "unknown")
+        confidence = det.get("confidence", 0.0)
+        track_id = det.get("track_id", 0)
+
+        if class_name == "intruder":
+            box_color = (0, 0, 255) if in_zone else (0, 255, 0)
+        else:
+            box_color = (255, 0, 0)
+
+        cv2.rectangle(
+            output,
+            (x1, y1),
+            (x2, y2),
+            box_color,
+            2
+        )
+
+        label = f"{class_name} ID:{track_id} {confidence:.2f}"
+
+        if in_zone:
+            label += " IN ZONE"
+
+        text_y = max(y1 - 10, 20)
+
+        cv2.putText(
+            output,
+            label,
+            (x1, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            box_color,
+            2,
+            cv2.LINE_AA
+        )
+
+    return output
+
+
+def start_recording(frame):
+    global recording_writer
+    global recording_filename
+
+    with recording_lock:
+        if recording_writer is not None:
+            return
+
+        height, width = frame.shape[:2]
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"intrusion_{timestamp}.mp4"
+        filepath = os.path.join(RECORDINGS_DIR, filename)
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+        writer = cv2.VideoWriter(
+            filepath,
+            fourcc,
+            RECORDING_FPS,
+            (width, height)
+        )
+
+        if not writer.isOpened():
+            log.error("Gagal membuka VideoWriter: %s", filepath)
+            return
+
+        recording_writer = writer
+        recording_filename = filename
+
+        log.info("CCTV recording dimulai: %s", filename)
+        return filename
+
+
+def write_recording_frame(frame):
+    global recording_writer
+
+    with recording_lock:
+        if recording_writer is not None:
+            recording_writer.write(frame)
+
+
+def stop_recording():
+    global recording_writer
+    global recording_filename
+
+    with recording_lock:
+        if recording_writer is None:
+            return
+
+        filename = recording_filename
+
+        recording_writer.release()
+
+        recording_writer = None
+        recording_filename = None
+
+        log.info("CCTV recording selesai: %s", filename)
+        return filename
+
 
 # ──────────────────────────────────────────────────────────────
 # Preprocessing / Postprocessing
@@ -251,16 +394,23 @@ def detect():
     for det in detections:
         tid    = det.get("track_id", 0)
         foot_x = (det["x1"] + det["x2"]) / 2
-        foot_y = det["y2"]
+        foot_y = (det["y1"] + det["y2"]) / 2
         cx     = (det["x1"] + det["x2"]) / 2
         cy     = (det["y1"] + det["y2"]) / 2
 
         in_zone = any(
-            point_in_polygon(foot_x, foot_y, zone, orig_w, orig_h)
+            point_in_polygon(
+                foot_x,
+                foot_y,
+                zone,
+                orig_w,
+                orig_h
+            )
             for zone in current_zones
         )
 
-        if in_zone and det["class_name"] == "intruder":
+        # Deteksi objek di dalam zona dianggap sebagai intrusi
+        if in_zone:
             intrusion_detected = True
 
         # Normalized coords for frontend
@@ -277,6 +427,61 @@ def detect():
 
         results.append(det)
 
+    # ──────────────────────────────────────────────────────────
+    # CCTV Recording
+    # ──────────────────────────────────────────────────────────
+
+    global recording_last_intrusion
+
+    current_time = time.time()
+
+    log.info(
+        "ZONE CHECK | detections=%d | zones=%d | intrusion=%s",
+        len(results),
+        len(current_zones),
+        intrusion_detected
+    )
+    
+    # Draw detection results onto the frame before saving it.
+    recorded_frame = draw_recording_overlay(
+        img_bgr,
+        results,
+        current_zones
+    )
+
+    log.info(
+        "DETECTION: intrusion=%s | detections=%s",
+        intrusion_detected,
+        [
+            {
+                "class": d.get("class_name"),
+                "track_id": d.get("track_id"),
+                "in_zone": d.get("in_zone")
+            }
+            for d in results
+        ]
+    )
+
+    
+    if intrusion_detected:
+        recording_last_intrusion = current_time
+
+        if recording_writer is None:
+            start_recording(recorded_frame)
+
+        write_recording_frame(recorded_frame)
+
+    elif recording_writer is not None:
+        # Keep recording a few seconds after the last intrusion.
+        write_recording_frame(recorded_frame)
+
+        if current_time - recording_last_intrusion >= RECORDING_POST_DELAY:
+            stop_recording()
+
+    # The filename is returned to the frontend so the event log
+    # can display the corresponding CCTV recording.
+    active_recording_filename = recording_filename
+
     # Optionally log event
     if intrusion_detected and data.get("save_event", False):
         event_log.append({
@@ -284,6 +489,11 @@ def detect():
             "thumbnail": data["frame"],
             "track_ids": [d["track_id"] for d in results if d.get("in_zone") and d["class_name"] == "intruder"],
             "count":     sum(1 for d in results if d.get("in_zone") and d["class_name"] == "intruder"),
+            "recording":  (
+                f"/recordings/{active_recording_filename}"
+                if active_recording_filename else None
+            ),
+            "recording_filename": active_recording_filename,
         })
         if len(event_log) > 100:
             event_log.pop(0)
@@ -293,6 +503,11 @@ def detect():
         "intrusion_detected": intrusion_detected,
         "zones_active":       len(current_zones),
         "frame_size":         {"w": orig_w, "h": orig_h},
+        "recording":           (
+            f"/recordings/{active_recording_filename}"
+            if active_recording_filename else None
+        ),
+        "recording_filename":  active_recording_filename,
     })
 
 
@@ -333,6 +548,49 @@ def reset_tracker():
 @app.route("/events", methods=["GET"])
 def get_events():
     return jsonify({"events": event_log[-50:]})
+
+@app.route("/recordings", methods=["GET"])
+def list_recordings():
+    files = []
+
+    if os.path.exists(RECORDINGS_DIR):
+        for filename in os.listdir(RECORDINGS_DIR):
+            if filename.lower().endswith(".mp4"):
+                filepath = os.path.join(RECORDINGS_DIR, filename)
+
+                files.append({
+                    "filename": filename,
+                    "url": f"/recordings/{filename}",
+                    "created": datetime.fromtimestamp(
+                        os.path.getctime(filepath)
+                    ).isoformat(timespec="seconds")
+                })
+
+    files.sort(
+        key=lambda x: x["created"],
+        reverse=True
+    )
+
+    return jsonify({
+        "recordings": files
+    })
+
+@app.route("/recordings/<path:filename>")
+def get_recording(filename):
+    return send_from_directory(
+        RECORDINGS_DIR,
+        filename,
+        as_attachment=False
+    )
+
+@app.route("/recording/stop", methods=["POST"])
+def manual_stop_recording():
+    filename = stop_recording()
+    return jsonify({
+        "status": "stopped",
+        "filename": filename,
+        "url": f"/recordings/{filename}" if filename else None
+    })
 
 
 @app.route("/events/clear", methods=["POST"])
