@@ -47,3 +47,5 @@ models/**/*.onnx
 
 # OpenVINO compile cache
 models/.ov_cache/
+
+recordings/
