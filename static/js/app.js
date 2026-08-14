@@ -109,6 +109,7 @@ const hwBadgeDot   = q('hw-badge-dot');
 // Log
 const logList  = q('log-list');
 const logEmpty = q('log-empty');
+const tooltip  = q('tooltip');
 
 // ─── Utility ──────────────────────────────────────────────────
 function setStatus(text, type = '') {
@@ -207,6 +208,43 @@ btnAudioToggle.addEventListener('click', () => {
     state.audioEnabled
       ? 'Matikan audio alert'
       : 'Aktifkan audio alert';
+});
+
+// ─── Theme Toggle ─────────────────────────────────────────────
+const btnThemeToggle = q('btn-theme-toggle');
+const iconThemeDark = q('icon-theme-dark');
+const iconThemeLight = q('icon-theme-light');
+
+function setTheme(theme) {
+  // Smooth transition lock
+  document.body.classList.add('theme-transition');
+  setTimeout(() => document.body.classList.remove('theme-transition'), 400);
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    iconThemeLight.style.display = 'none';
+    iconThemeDark.style.display = '';
+    localStorage.setItem('theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    iconThemeDark.style.display = 'none';
+    iconThemeLight.style.display = '';
+    localStorage.setItem('theme', 'dark');
+  }
+}
+
+// Load saved theme
+if (localStorage.getItem('theme') === 'light') {
+  setTheme('light');
+}
+
+btnThemeToggle.addEventListener('click', () => {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  if (currentTheme === 'light') {
+    setTheme('dark');
+  } else {
+    setTheme('light');
+  }
 });
 
 // ─── Slider wiring ────────────────────────────────────────────
@@ -440,6 +478,7 @@ function closeZonePolygon() {
   state.zoneComplete = true;
 
   zoneCanvas.classList.remove('drawing');
+  tooltip.classList.remove('visible');
 
   document
     .getElementById('canvas-wrapper')
@@ -473,6 +512,7 @@ function resetZone() {
   );
 
   zoneCanvas.classList.remove('drawing');
+  tooltip.classList.remove('visible');
 
   document
     .getElementById('canvas-wrapper')
@@ -587,8 +627,33 @@ zoneCanvas.addEventListener(
 
     drawZoneOverlay();
     updateZoneInfo();
+    
+    // Update tooltip text immediately upon click
+    if (!state.zoneComplete && tooltip.classList.contains('visible')) {
+      tooltip.textContent = state.zonePoints.length < 3 ? `Klik untuk tambah titik (kurang ${3 - state.zonePoints.length})` : 'Klik untuk titik selanjutnya, atau tutup zona';
+    }
   }
 );
+
+zoneCanvas.addEventListener('mousemove', e => {
+  if (state.drawingZone && !state.zoneComplete) {
+    if (state.zonePoints.length === 0) {
+      tooltip.textContent = 'Klik untuk menentukan titik pertama';
+    } else if (state.zonePoints.length < 3) {
+      tooltip.textContent = `Klik untuk tambah titik (kurang ${3 - state.zonePoints.length})`;
+    } else {
+      tooltip.textContent = 'Klik untuk titik selanjutnya, atau klik "Tutup Polygon"';
+    }
+    
+    tooltip.classList.add('visible');
+    tooltip.style.left = (e.clientX + 15) + 'px';
+    tooltip.style.top = (e.clientY + 15) + 'px';
+  }
+});
+
+zoneCanvas.addEventListener('mouseleave', () => {
+  tooltip.classList.remove('visible');
+});
 
 function drawZoneOverlay() {
   zCtx.clearRect(
