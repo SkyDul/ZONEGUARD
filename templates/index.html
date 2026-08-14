@@ -40,6 +40,22 @@
     </div>
 
     <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" id="btn-theme-toggle" title="Ganti Tema" aria-label="Toggle theme">
+        <svg id="icon-theme-dark" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg id="icon-theme-light" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <button class="btn btn-ghost btn-sm" id="btn-audio-toggle" title="Toggle audio alert" aria-label="Toggle audio alert">
         <svg id="icon-audio-on" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -83,14 +99,14 @@
   <aside class="panel panel-left" id="panel-left">
     <div class="panel-section">
       <h2 class="panel-title">Kamera</h2>
-      <div class="cam-controls">
-        <button class="btn btn-primary w-full" id="btn-start-cam">
+      <div class="control-grid">
+        <button class="btn btn-primary w-full" id="btn-start-cam" title="Aktifkan Webcam">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M16 10L22 7V17L16 14V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          Aktifkan Webcam
+          Mulai
         </button>
-        <button class="btn btn-ghost w-full" id="btn-stop-cam" disabled>
+        <button class="btn btn-ghost w-full" id="btn-stop-cam" disabled title="Hentikan Webcam">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
-          Hentikan Webcam
+          Berhenti
         </button>
       </div>
     </div>
@@ -100,18 +116,15 @@
     <div class="panel-section">
       <h2 class="panel-title">Zona Terlarang</h2>
       <p class="panel-desc">Klik di atas video untuk menandai titik-titik area terlarang, lalu tutup polygon.</p>
-      <div class="zone-controls">
-        <button class="btn btn-warning w-full" id="btn-draw-zone" disabled>
+      <div class="control-grid control-grid-3">
+        <button class="btn btn-warning w-full" id="btn-draw-zone" disabled title="Gambar Zona Terlarang">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 19L19 12L22 9L15 2L12 5L5 12L12 19Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M18 13L22 22L17 20L13 22L18 13Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          Gambar Zona
         </button>
-        <button class="btn btn-ghost w-full" id="btn-close-zone" disabled>
+        <button class="btn btn-ghost w-full" id="btn-close-zone" disabled title="Tutup Polygon Zona">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="20 6 9 17 4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Tutup Polygon
         </button>
-        <button class="btn btn-danger-ghost w-full" id="btn-reset-zone" disabled>
+        <button class="btn btn-danger-ghost w-full" id="btn-reset-zone" disabled title="Reset Zona">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 6V20C19 20.55 18.55 21 18 21H6C5.45 21 5 20.55 5 20V6M8 6V4C8 3.45 8.45 3 9 3H15C15.55 3 16 3.45 16 4V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Reset Zona
         </button>
       </div>
       <div class="zone-info" id="zone-info">
@@ -125,20 +138,20 @@
 
     <div class="panel-section">
       <h2 class="panel-title">Deteksi</h2>
-      <div class="detect-controls">
-        <button class="btn btn-success w-full" id="btn-start-detect" disabled>
+      <div class="control-grid">
+        <button class="btn btn-success w-full" id="btn-start-detect" disabled title="Mulai Deteksi">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Mulai Deteksi
+          Mulai
         </button>
-        <button class="btn btn-ghost w-full" id="btn-stop-detect" disabled>
+        <button class="btn btn-ghost w-full" id="btn-stop-detect" disabled title="Hentikan Deteksi">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="4" width="4" height="16" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
-          Hentikan Deteksi
+          Berhenti
         </button>
       </div>
 
       <div class="slider-group">
         <label class="slider-label" for="conf-slider">
-          Confidence Threshold
+          Sensitivitas Deteksi
           <span class="slider-value" id="conf-value">0.40</span>
         </label>
         <input type="range" id="conf-slider" class="slider" min="0.1" max="0.95" step="0.05" value="0.40" aria-label="Confidence threshold" />
@@ -147,7 +160,7 @@
 
       <div class="slider-group">
         <label class="slider-label" for="interval-slider">
-          Interval Deteksi
+          Kecepatan Cek (ms)
           <span class="slider-value" id="interval-value">300ms</span>
         </label>
         <input type="range" id="interval-slider" class="slider" min="100" max="1000" step="50" value="300" aria-label="Detection interval" />
@@ -161,28 +174,36 @@
     <!-- Top Stats Bar -->
     <div class="top-stats-bar">
       <div class="stat-card">
-        <div class="stat-icon">📹</div>
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="6" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M16 10L22 7V17L16 14V10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </div>
         <div class="stat-content">
           <div class="stat-value" id="stat-frames">0</div>
           <div class="stat-label">Frame Diproses</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">👤</div>
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
         <div class="stat-content">
           <div class="stat-value" id="stat-persons">0</div>
           <div class="stat-label">Orang Terdeteksi</div>
         </div>
       </div>
       <div class="stat-card stat-card-danger">
-        <div class="stat-icon">🚨</div>
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.29 3.86L1.82 18C1.64 18.3 1.55 18.64 1.55 18.99C1.55 19.99 2.36 20.81 3.37 20.81H20.63C21.64 20.81 22.45 20 22.45 18.99C22.45 18.64 22.36 18.3 22.18 18L13.71 3.86C13.32 3.19 12.62 2.79 11.86 2.79C11.1 2.79 10.4 3.19 10.29 3.86Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="currentColor"/></svg>
+        </div>
         <div class="stat-content">
           <div class="stat-value danger" id="stat-intrusions">0</div>
           <div class="stat-label">Total Intrusi</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">⚡</div>
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
         <div class="stat-content">
           <div class="stat-value" id="stat-fps">–</div>
           <div class="stat-label">Latency (ms)</div>
@@ -222,11 +243,15 @@
         <span id="vsb-detect-label">Idle</span>
       </div>
       <div class="vsb-item">
-        <span class="vsb-icon">⬡</span>
+        <span class="vsb-icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;"><path d="M21 16V8C20.9996 7.64927 20.9071 7.30671 20.7315 7.00116C20.556 6.69561 20.3027 6.43574 20 6.25L13 2.25C12.693 2.08331 12.3503 1.9961 12 1.9961C11.6497 1.9961 11.307 2.08331 11 2.25L4 6.25C3.69733 6.43574 3.444 6.69561 3.26846 7.00116C3.09292 7.30671 3.00043 7.64927 3 8V16C3.00043 16.3507 3.09292 16.6933 3.26846 16.9988C3.444 17.3044 3.69733 17.5643 4 17.75L11 21.75C11.307 21.9167 11.6497 22.0039 12 22.0039C12.3503 22.0039 12.693 21.9167 13 21.75L20 17.75C20.3027 17.5643 20.556 17.3044 20.7315 16.9988C20.9071 16.6933 20.9996 16.3507 21 16Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
         <span id="vsb-zone-label">Zona: 0 titik</span>
       </div>
       <div class="vsb-item">
-        <span class="vsb-icon">🎯</span>
+        <span class="vsb-icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+        </span>
         <span id="vsb-conf-label">Conf: 0.40</span>
       </div>
       <div class="vsb-sep"></div>
