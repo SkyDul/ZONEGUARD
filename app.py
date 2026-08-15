@@ -617,5 +617,11 @@ def status():
     })
 
 
+import sys
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    use_ssl = "--ssl" in sys.argv
+    ssl_context = "adhoc" if use_ssl else None
+    if use_ssl:
+        log.info("Menjalankan server dengan HTTPS (ssl_context='adhoc')")
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True, ssl_context=ssl_context)

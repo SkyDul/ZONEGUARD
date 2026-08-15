@@ -6,7 +6,7 @@
 'use strict';
 
 // ─── Config ───────────────────────────────────────────────────
-const API_BASE         = 'http://localhost:5000';
+const API_BASE         = window.location.origin;
 const SAVE_EVENT_EVERY = 3;
 const MAX_LOG_ITEMS    = 50;
 
@@ -25,6 +25,100 @@ function getTrackColor(id) {
 
   return trackColors[id];
 }
+
+// ─── MediaDevices Polyfill & Helper ───────────────────────────
+if (typeof navigator !== 'undefined') {
+  if (navigator.mediaDevices === undefined) {
+    navigator.mediaDevices = {};
+  }
+  if (navigator.mediaDevices.getUserMedia === undefined) {
+    navigator.mediaDevices.getUserMedia = function(constraints) {
+      const getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.getUserMedia;
+      if (!getUserMedia) {
+        return Promise.reject(new Error("Browsers require HTTPS or accessing via http://localhost:5000 (http://127.0.0.1:5000) to grant webcam access."));
+      }
+      return new Promise((resolve, reject) => {
+        getUserMedia.call(navigator, constraints, resolve, reject);
+      });
+    };
+  }
+}
+
+async function getWebcamStream() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'environment'
+      },
+      audio: false
+    });
+  } catch (err) {
+    if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+      return await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
+    throw err;
+  }
+}
+
+// ─── Centered Custom Modal Alert ──────────────────────────────
+function showAlertModal(title, message, type = 'warning') {
+  const modalOverlay = q('custom-modal-overlay');
+  const modalTitle   = q('modal-title');
+  const modalMessage = q('modal-message');
+  const modalIcon    = q('modal-icon');
+
+  if (!modalOverlay) {
+    console.warn('Modal overlay element not found');
+    return;
+  }
+
+  if (!message && title) {
+    message = title;
+    title = 'Pemberitahuan';
+  }
+
+  modalTitle.textContent = title || 'Pemberitahuan';
+  modalMessage.textContent = message || '';
+  modalIcon.className = 'modal-icon ' + (type || 'warning');
+
+  modalOverlay.classList.add('active');
+  modalOverlay.setAttribute('aria-hidden', 'false');
+}
+
+function closeAlertModal() {
+  const modalOverlay = q('custom-modal-overlay');
+  if (modalOverlay) {
+    modalOverlay.classList.remove('active');
+    modalOverlay.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// Override standard window.alert to automatically display in custom centered modal
+window.alert = function(msg) {
+  showAlertModal('Pemberitahuan', msg, 'warning');
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnClose = q('modal-btn-close');
+  const modalOverlay = q('custom-modal-overlay');
+
+  if (btnClose) {
+    btnClose.addEventListener('click', closeAlertModal);
+  }
+
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        closeAlertModal();
+      }
+    });
+  }
+});
 
 // ─── State ────────────────────────────────────────────────────
 const state = {
@@ -290,20 +384,28 @@ async function startCamera() {
     'warning'
   );
 
+  const isSecure = window.isSecureContext !== false || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus('Akses webcam diblokir browser', 'error');
+    let msg = 'Gagal Mengakses Webcam:\n\n';
+    if (!isSecure) {
+      msg += 'Browser memblokir akses kamera karena aplikasi diakses melalui HTTP IP/Domain non-localhost (' + window.location.origin + ').\n\n' +
+             'Cara Mengatasinya:\n' +
+             '1. Buka aplikasi menggunakan: http://localhost:5000 atau http://127.0.0.1:5000\n' +
+             '2. Jika mengakses dari IP jaringan lokal (misal http://192.168.x.x:5000):\n' +
+             '   - Buka chrome://flags/#unsafely-treat-insecure-origin-as-secure di Chrome / Edge\n' +
+             '   - Tambahkan URL origin ini (' + window.location.origin + '), ubah opsi ke "Enabled", lalu klik "Relaunch".\n' +
+             '3. Atau jalankan server menggunakan HTTPS.';
+    } else {
+      msg += 'Browser Anda tidak mendukung WebRTC Webcam API (getUserMedia) atau akses kamera telah diblokir di pengaturan browser.';
+    }
+    alert(msg);
+    return;
+  }
+
   try {
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: {
-            ideal: 1280
-          },
-          height: {
-            ideal: 720
-          },
-          facingMode: 'environment'
-        },
-        audio: false
-      });
+    const stream = await getWebcamStream();
 
     videoEl.srcObject = stream;
 
@@ -347,13 +449,22 @@ async function startCamera() {
 
     setStatus(
       'Gagal akses kamera',
-      ''
+      'error'
     );
 
-    alert(
-      'Tidak dapat mengakses webcam: ' +
-      err.message
-    );
+    let errorDetail = err.message || err.name || 'Unknown error';
+
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorDetail = 'Izin penggunaan webcam ditolak oleh browser/pengguna.\nMohon izinkan akses kamera pada ikon gembok/kamera di address bar browser Anda.';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      errorDetail = 'Tidak ada perangkat webcam yang terdeteksi di perangkat Anda.';
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorDetail = 'Webcam sedang digunakan oleh aplikasi lain (seperti Zoom, Teams, Skype, atau tab browser lain). Mohon tutup aplikasi tersebut dan coba lagi.';
+    } else if (!isSecure) {
+      errorDetail = 'Browser memblokir webcam pada koneksi HTTP IP (' + window.location.origin + '). Silakan buka via http://localhost:5000 atau http://127.0.0.1:5000.';
+    }
+
+    alert('Tidak dapat mengakses webcam:\n\n' + errorDetail);
   }
 }
 

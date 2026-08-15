@@ -301,30 +301,52 @@ body {
 }
 
 /* ════════════════════════════════════
-   ALERT BANNER
+   ALERT BANNER (FLOATING CENTERED POPUP)
 ════════════════════════════════════ */
 .alert-banner {
   display: none;
-  background: linear-gradient(135deg, rgba(255, 40, 60, 0.95), rgba(180, 20, 40, 0.95));
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 64, 96, 0.5);
-  padding: 10px 20px;
-  animation: banner-slide 0.3s ease;
-  position: relative;
-  z-index: 99;
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(255, 35, 60, 0.95), rgba(180, 15, 35, 0.95));
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 90, 110, 0.6);
+  border-radius: var(--radius-lg);
+  padding: 12px 28px;
+  box-shadow: 0 12px 40px rgba(255, 40, 60, 0.5), 0 0 24px rgba(255, 40, 60, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  z-index: 9999;
+  max-width: 90vw;
+  width: auto;
+  pointer-events: auto;
 }
 
-.alert-banner.active { display: block; }
-.alert-banner.pulsing { animation: banner-pulse 0.5s ease infinite alternate; }
-
-@keyframes banner-slide {
-  from { transform: translateY(-100%); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
+.alert-banner.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: banner-pop-center 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-@keyframes banner-pulse {
-  from { background: linear-gradient(135deg, rgba(255, 40, 60, 0.95), rgba(180, 20, 40, 0.95)); }
-  to   { background: linear-gradient(135deg, rgba(255, 80, 100, 1), rgba(220, 40, 60, 1)); }
+.alert-banner.pulsing {
+  animation: banner-pulse-center 0.5s ease infinite alternate;
+}
+
+@keyframes banner-pop-center {
+  from { opacity: 0; transform: translate(-50%, -20px) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes banner-pulse-center {
+  from {
+    background: linear-gradient(135deg, rgba(255, 35, 60, 0.95), rgba(180, 15, 35, 0.95));
+    box-shadow: 0 12px 40px rgba(255, 40, 60, 0.5), 0 0 24px rgba(255, 40, 60, 0.3);
+  }
+  to {
+    background: linear-gradient(135deg, rgba(255, 75, 95, 1), rgba(220, 30, 55, 1));
+    box-shadow: 0 16px 50px rgba(255, 40, 60, 0.75), 0 0 35px rgba(255, 40, 60, 0.5);
+    transform: translate(-50%, 0) scale(1.03);
+  }
 }
 
 .alert-banner-inner {
@@ -936,6 +958,111 @@ body {
 }
 
 .tooltip.visible { opacity: 1; }
+
+/* ════════════════════════════════════
+   CENTERED MODAL DIALOG POPUP
+════════════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  padding: 20px;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px var(--accent-dim);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 460px;
+  padding: 24px;
+  transform: scale(0.9) translateY(10px);
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text-primary);
+}
+
+.modal-overlay.active .modal-box {
+  transform: scale(1) translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--accent-glow);
+}
+
+.modal-icon.danger {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border-color: var(--danger-glow);
+}
+
+.modal-icon.warning {
+  background: var(--warning-dim);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.modal-icon.success {
+  background: var(--success-dim);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.modal-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-body {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
 
 /* ════════════════════════════════════
    STATE MODIFIERS

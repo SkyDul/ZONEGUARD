@@ -286,6 +286,24 @@
 <!-- ════════════════ TOOLTIP ════════════════ -->
 <div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
 
+<!-- ════════════════ CENTERED MODAL ALERT ════════════════ -->
+<div class="modal-overlay" id="custom-modal-overlay" aria-hidden="true">
+  <div class="modal-box" id="custom-modal-box">
+    <div class="modal-header">
+      <div class="modal-icon warning" id="modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 9V14M12 17.5H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3 class="modal-title" id="modal-title">Pemberitahuan</h3>
+    </div>
+    <div class="modal-body" id="modal-message"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="modal-btn-close">Mengerti</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════ SCRIPTS ════════════════ -->
 <script src="/static/js/app.js"></script>
 </body>
